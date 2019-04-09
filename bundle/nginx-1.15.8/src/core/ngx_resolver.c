@@ -4677,6 +4677,9 @@ ngx_udp_connect(ngx_resolver_connection_t *rec)
 
     rev->log = &rec->log;
     wev->log = &rec->log;
+#if (NGX_SSL)
+    c->async->log = &rec->log;
+#endif
 
     rec->udp = c;
 
@@ -4778,6 +4781,9 @@ ngx_tcp_connect(ngx_resolver_connection_t *rec)
 
     rev->log = &rec->log;
     wev->log = &rec->log;
+#if (NGX_SSL)
+    c->async->log = &rec->log;
+#endif
 
     rec->tcp = c;
 

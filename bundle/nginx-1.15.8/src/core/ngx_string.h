@@ -2,6 +2,7 @@
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
+ * Copyright (C) Intel, Inc.
  */
 
 
@@ -97,6 +98,18 @@ void *ngx_memcpy(void *dst, const void *src, size_t n);
 #define ngx_cpymem(dst, src, n)   (((u_char *) ngx_memcpy(dst, src, n)) + (n))
 
 #else
+
+#if (NGX_SECURE_MEM)
+
+#define _MIN_(a,b) (((a)<(b))?(a):(b))
+#define MEMCPY_S(dest, src, dest_sz, src_sz) \
+            memcpy((void *)(dest), (void *) (src), (size_t)_MIN_(dest_sz, src_sz))
+#define ngx_memcpy(dst, src, n)   (void) MEMCPY_S(dst, src, n, n)
+#define ngx_cpymem(dst, src, n)   (((u_char *) MEMCPY_S(dst, src, n, n)) + (n))
+
+#endif /* NGX_SECURE_MEM */
+
+#endif /* NGX_MEMCPY_LIMIT */
 
 /*
  * gcc3, msvc, and icc7 compile memcpy() to the inline "rep movs".
