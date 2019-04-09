@@ -2,6 +2,7 @@
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
+ * Copyright (C) Intel, Inc.
  */
 
 
@@ -54,7 +55,6 @@ typedef struct ngx_thread_pool_s  ngx_thread_pool_t;
 #define NGX_HTTP_KEEPALIVE_DISABLE_MSIE6   0x0004
 #define NGX_HTTP_KEEPALIVE_DISABLE_SAFARI  0x0008
 
-
 #define NGX_HTTP_SERVER_TOKENS_OFF      0
 #define NGX_HTTP_SERVER_TOKENS_ON       1
 #define NGX_HTTP_SERVER_TOKENS_BUILD    2
@@ -73,6 +73,7 @@ typedef struct {
     unsigned                   bind:1;
     unsigned                   wildcard:1;
     unsigned                   ssl:1;
+    unsigned                   asynch:1;
     unsigned                   http2:1;
 #if (NGX_HAVE_INET6)
     unsigned                   ipv6only:1;
@@ -237,6 +238,7 @@ struct ngx_http_addr_conf_s {
     ngx_http_virtual_names_t  *virtual_names;
 
     unsigned                   ssl:1;
+    unsigned                   asynch:1;
     unsigned                   http2:1;
     unsigned                   proxy_protocol:1;
 };

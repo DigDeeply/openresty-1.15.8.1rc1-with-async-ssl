@@ -2,13 +2,14 @@
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
+ * Copyright (C) Intel, Inc.
  */
 
 
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
-
+#include <ngx_ssl_engine.h>
 
 #if (NGX_HTTP_CACHE)
 static ngx_int_t ngx_http_upstream_cache(ngx_http_request_t *r,
@@ -953,7 +954,8 @@ ngx_http_upstream_cache(ngx_http_request_t *r, ngx_http_upstream_t *u)
 
     case NGX_DECLINED:
 
-        if ((size_t) (u->buffer.end - u->buffer.start) < u->conf->buffer_size) {
+        if ((size_t) (unsigned) (u->buffer.end - u->buffer.start) \
+            < u->conf->buffer_size) {
             u->buffer.start = NULL;
 
         } else {
@@ -1336,7 +1338,14 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
         if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && ev->active) {
 
             event = ev->write ? NGX_WRITE_EVENT : NGX_READ_EVENT;
-
+#if (NGX_HTTP_SSL)
+            if (c->asynch && ngx_del_async_conn) {
+                if (c->num_async_fds) {
+                    ngx_del_async_conn(c, NGX_DISABLE_EVENT);
+                    c->num_async_fds--;
+                }
+            }
+#endif
             if (ngx_del_event(ev, event, 0) != NGX_OK) {
                 ngx_http_upstream_finalize_request(r, u,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -1463,7 +1472,14 @@ ngx_http_upstream_check_broken_connection(ngx_http_request_t *r,
     if ((ngx_event_flags & NGX_USE_LEVEL_EVENT) && ev->active) {
 
         event = ev->write ? NGX_WRITE_EVENT : NGX_READ_EVENT;
-
+#if (NGX_HTTP_SSL)
+        if (c->asynch && ngx_del_async_conn) {
+            if (c->num_async_fds) {
+                ngx_del_async_conn(c, NGX_DISABLE_EVENT);
+                c->num_async_fds--;
+            }
+        }
+#endif
         if (ngx_del_event(ev, event, 0) != NGX_OK) {
             ngx_http_upstream_finalize_request(r, u,
                                                NGX_HTTP_INTERNAL_SERVER_ERROR);
@@ -1600,6 +1616,9 @@ ngx_http_upstream_connect(ngx_http_request_t *r, ngx_http_upstream_t *u)
     c->log = r->connection->log;
     c->pool->log = c->log;
     c->read->log = c->log;
+#if (NGX_SSL)
+    c->async->log = c->log;
+#endif
     c->write->log = c->log;
 
     /* init or reinit the ngx_output_chain() and ngx_chain_writer() contexts */
@@ -1720,6 +1739,10 @@ ngx_http_upstream_ssl_init_connection(ngx_http_request_t *r,
     }
 
     r->connection->log->action = "SSL handshaking to upstream";
+
+    if (ngx_use_ssl_engine && ngx_ssl_engine_enable_heuristic_polling) {
+        (void) ngx_atomic_fetch_add(ngx_ssl_active, 1);
+    }
 
     rc = ngx_ssl_handshake(c);
 
@@ -4421,7 +4444,8 @@ ngx_http_upstream_finalize_request(ngx_http_request_t *r,
             }
         }
 
-        ngx_http_file_cache_free(r->cache, u->pipe->temp_file);
+        if (u->pipe)
+            ngx_http_file_cache_free(r->cache, u->pipe->temp_file);
     }
 
 #endif
