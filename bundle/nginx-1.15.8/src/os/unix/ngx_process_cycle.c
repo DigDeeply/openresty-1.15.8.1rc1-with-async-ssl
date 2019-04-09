@@ -2,6 +2,7 @@
 /*
  * Copyright (C) Igor Sysoev
  * Copyright (C) Nginx, Inc.
+ * Copyright (C) Intel, Inc.
  */
 
 
@@ -9,7 +10,8 @@
 #include <ngx_core.h>
 #include <ngx_event.h>
 #include <ngx_channel.h>
-
+#include <ngx_ssl_engine.h>
+#include <openssl/rand.h>
 
 static void ngx_start_worker_processes(ngx_cycle_t *cycle, ngx_int_t n,
     ngx_int_t type);
@@ -685,6 +687,13 @@ ngx_reap_children(ngx_cycle_t *cycle)
                 && !ngx_terminate
                 && !ngx_quit)
             {
+#if (NGX_SSL)
+                /* Delay added to give Quickassist Driver time to cleanup
+                * if worker exit with non-zero code. */
+                if(ngx_processes[i].status != 0) {
+                    usleep(2000000);
+                }
+#endif
                 if (ngx_spawn_process(cycle, ngx_processes[i].proc,
                                       ngx_processes[i].data,
                                       ngx_processes[i].name, i)
@@ -789,7 +798,6 @@ ngx_master_process_exit(ngx_cycle_t *cycle)
     exit(0);
 }
 
-
 static void
 ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 {
@@ -800,11 +808,19 @@ ngx_worker_process_cycle(ngx_cycle_t *cycle, void *data)
 
     ngx_worker_process_init(cycle, worker);
 
+    if(ngx_ssl_engine_init) {
+        ngx_ssl_engine_init(cycle);
+    }
+
     ngx_setproctitle("worker process");
 
     for ( ;; ) {
 
         if (ngx_exiting) {
+            if(ngx_ssl_engine_release) {
+                ngx_ssl_engine_release(cycle);
+            }
+
             if (ngx_event_no_timers_left() == NGX_OK) {
                 ngx_log_error(NGX_LOG_NOTICE, cycle->log, 0, "exiting");
                 ngx_worker_process_exit(cycle);
@@ -1119,6 +1135,8 @@ ngx_channel_handler(ngx_event_t *ev)
         return;
     }
 
+    ngx_memzero(&ch, sizeof(ngx_channel_t));
+
     c = ev->data;
 
     ngx_log_debug0(NGX_LOG_DEBUG_CORE, ev->log, 0, "channel handler");
@@ -1132,6 +1150,14 @@ ngx_channel_handler(ngx_event_t *ev)
         if (n == NGX_ERROR) {
 
             if (ngx_event_flags & NGX_USE_EPOLL_EVENT) {
+#if (NGX_SSL)
+                if (c->asynch && ngx_del_async_conn) {
+                    if (c->num_async_fds) {
+                        ngx_del_async_conn(c, NGX_DISABLE_EVENT);
+                        c->num_async_fds--;
+                    }
+                }
+#endif
                 ngx_del_conn(c, 0);
             }
 
