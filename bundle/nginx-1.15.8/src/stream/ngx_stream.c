@@ -2,6 +2,7 @@
 /*
  * Copyright (C) Roman Arutyunyan
  * Copyright (C) Nginx, Inc.
+ * Copyright (C) Intel, Inc.
  */
 
 
@@ -572,8 +573,9 @@ ngx_stream_add_addrs(ngx_conf_t *cf, ngx_stream_port_t *stport,
         addrs[i].addr = sin->sin_addr.s_addr;
 
         addrs[i].conf.ctx = addr[i].opt.ctx;
-#if (NGX_STREAM_SSL)
         addrs[i].conf.ssl = addr[i].opt.ssl;
+#if (NGX_STREAM_SSL)
+        addrs[i].conf.asynch = addr[i].opt.asynch;
 #endif
         addrs[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
 
@@ -622,8 +624,9 @@ ngx_stream_add_addrs6(ngx_conf_t *cf, ngx_stream_port_t *stport,
         addrs6[i].addr6 = sin6->sin6_addr;
 
         addrs6[i].conf.ctx = addr[i].opt.ctx;
-#if (NGX_STREAM_SSL)
         addrs6[i].conf.ssl = addr[i].opt.ssl;
+#if (NGX_STREAM_SSL)
+        addrs6[i].conf.asynch = addr[i].opt.asynch;
 #endif
         addrs6[i].conf.proxy_protocol = addr[i].opt.proxy_protocol;
 
