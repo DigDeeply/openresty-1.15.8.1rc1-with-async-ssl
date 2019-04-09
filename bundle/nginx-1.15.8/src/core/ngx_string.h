@@ -107,9 +107,7 @@ void *ngx_memcpy(void *dst, const void *src, size_t n);
 #define ngx_memcpy(dst, src, n)   (void) MEMCPY_S(dst, src, n, n)
 #define ngx_cpymem(dst, src, n)   (((u_char *) MEMCPY_S(dst, src, n, n)) + (n))
 
-#endif /* NGX_SECURE_MEM */
-
-#endif /* NGX_MEMCPY_LIMIT */
+#else
 
 /*
  * gcc3, msvc, and icc7 compile memcpy() to the inline "rep movs".
@@ -119,8 +117,9 @@ void *ngx_memcpy(void *dst, const void *src, size_t n);
 #define ngx_memcpy(dst, src, n)   (void) memcpy(dst, src, n)
 #define ngx_cpymem(dst, src, n)   (((u_char *) memcpy(dst, src, n)) + (n))
 
-#endif
+#endif /* NGX_SECURE_MEM */
 
+#endif /* NGX_MEMCPY_LIMIT */
 
 #if ( __INTEL_COMPILER >= 800 )
 
