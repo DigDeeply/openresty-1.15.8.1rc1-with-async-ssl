@@ -781,13 +781,13 @@ ngx_get_options(int argc, char *const *argv)
 
             case 't':
                 ngx_test_config = 1;
-                ngx_no_ssl_init = 1
+                ngx_no_ssl_init = 1;
                 break;
 
             case 'T':
                 ngx_test_config = 1;
                 ngx_dump_config = 1;
-                ngx_no_ssl_init = 1
+                ngx_no_ssl_init = 1;
                 break;
 
             case 'q':
