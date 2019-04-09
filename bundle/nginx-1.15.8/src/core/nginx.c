@@ -186,7 +186,7 @@ static ngx_uint_t   ngx_show_configure;
 /* indicate that nginx start without ngx_ssl_init()
  * which will involve OpenSSL configuration file to
  * start OpenSSL engine */
-static ngx_uint_t   ngx_no_ssl_init
+static ngx_uint_t   ngx_no_ssl_init;
 static u_char      *ngx_prefix;
 static u_char      *ngx_conf_file;
 static u_char      *ngx_conf_params;
