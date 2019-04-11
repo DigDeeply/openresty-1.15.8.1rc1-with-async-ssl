@@ -15,6 +15,11 @@
 #define NGX_SSL_PASSWORD_BUFFER_SIZE  4096
 
 
+typedef struct {
+    ngx_uint_t  engine;   /* unsigned  engine:1; */
+} ngx_openssl_conf_t;
+
+
 static int ngx_ssl_password_callback(char *buf, int size, int rwflag,
     void *userdata);
 static int ngx_ssl_verify_callback(int ok, X509_STORE_CTX *x509_store);
@@ -77,6 +82,10 @@ static time_t ngx_ssl_parse_time(
 #endif
     ASN1_TIME *asn1time);
 
+static void *ngx_openssl_create_conf(ngx_cycle_t *cycle);
+static char *ngx_openssl_engine(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static void ngx_openssl_exit(ngx_cycle_t *cycle);
+
 static void ngx_ssl_handshake_async_handler(ngx_event_t * aev);
 static void ngx_ssl_read_async_handler(ngx_event_t * aev);
 static void ngx_ssl_write_async_handler(ngx_event_t * aev);
@@ -84,6 +93,41 @@ static void ngx_ssl_shutdown_async_handler(ngx_event_t *aev);
 
 
 #define NGX_ASYNC_EVENT_TIMEOUT 10000
+
+static ngx_command_t  ngx_openssl_commands[] = {
+
+    { ngx_string("ssl_engine"),
+      NGX_MAIN_CONF|NGX_DIRECT_CONF|NGX_CONF_TAKE1,
+      ngx_openssl_engine,
+      0,
+      0,
+      NULL },
+
+      ngx_null_command
+};
+
+
+static ngx_core_module_t  ngx_openssl_module_ctx = {
+    ngx_string("openssl"),
+    ngx_openssl_create_conf,
+    NULL
+};
+
+
+ngx_module_t  ngx_openssl_module = {
+    NGX_MODULE_V1,
+    &ngx_openssl_module_ctx,               /* module context */
+    ngx_openssl_commands,                  /* module directives */
+    NGX_CORE_MODULE,                       /* module type */
+    NULL,                                  /* init master */
+    NULL,                                  /* init module */
+    NULL,                                  /* init process */
+    NULL,                                  /* init thread */
+    NULL,                                  /* exit thread */
+    NULL,                                  /* exit process */
+    ngx_openssl_exit,                      /* exit master */
+    NGX_MODULE_V1_PADDING
+};
 
 
 int  ngx_ssl_connection_index;
@@ -5191,4 +5235,86 @@ ngx_ssl_parse_time(
     BIO_free(bio);
 
     return time;
+}
+
+
+static void *
+ngx_openssl_create_conf(ngx_cycle_t *cycle)
+{
+    ngx_openssl_conf_t  *oscf;
+
+    oscf = ngx_pcalloc(cycle->pool, sizeof(ngx_openssl_conf_t));
+    if (oscf == NULL) {
+        return NULL;
+    }
+
+    /*
+     * set by ngx_pcalloc():
+     *
+     *     oscf->engine = 0;
+     */
+
+    return oscf;
+}
+
+
+static char *
+ngx_openssl_engine(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+#ifndef OPENSSL_NO_ENGINE
+
+    ngx_openssl_conf_t *oscf = conf;
+
+    ENGINE     *engine;
+    ngx_str_t  *value;
+
+    if (oscf->engine) {
+        return "is duplicate";
+    }
+
+    oscf->engine = 1;
+
+    value = cf->args->elts;
+
+    engine = ENGINE_by_id((char *) value[1].data);
+
+    if (engine == NULL) {
+        ngx_ssl_error(NGX_LOG_EMERG, cf->log, 0,
+                      "ENGINE_by_id(\"%V\") failed", &value[1]);
+        return NGX_CONF_ERROR;
+    }
+
+    if (ENGINE_set_default(engine, ENGINE_METHOD_ALL) == 0) {
+        ngx_ssl_error(NGX_LOG_EMERG, cf->log, 0,
+                      "ENGINE_set_default(\"%V\", ENGINE_METHOD_ALL) failed",
+                      &value[1]);
+
+        ENGINE_free(engine);
+
+        return NGX_CONF_ERROR;
+    }
+
+    ENGINE_free(engine);
+
+    return NGX_CONF_OK;
+
+#else
+
+    return "is not supported";
+
+#endif
+}
+
+
+static void
+ngx_openssl_exit(ngx_cycle_t *cycle)
+{
+#if OPENSSL_VERSION_NUMBER < 0x10100003L
+
+    EVP_cleanup();
+#ifndef OPENSSL_NO_ENGINE
+    ENGINE_cleanup();
+#endif
+
+#endif
 }
